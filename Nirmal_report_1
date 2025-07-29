@@ -1,0 +1,136 @@
+#!/bin/bash
+
+# ===== CONFIGURATION =====
+REPORT_DIR="/home/oracle/reports"   # change to your preferred location
+TIMESTAMP=$(date +%Y%m%d%H%M%S)
+HTML_FILE="${REPORT_DIR}/dg_standby_report_${TIMESTAMP}.html"
+DB_LIST=("DBDR1" "DBDR2" "DBDR3" "DBDR4" "DBDR5" "DBDR6" "DBDR7" "DBDR8" "DBDR9" "DBDR10")
+MAX_LAG_THRESHOLD=50
+
+# ===== FUNCTIONS =====
+
+load_db_env() {
+  export ORACLE_SID=$1
+  export ORAENV_ASK=NO
+  . oraenv > /dev/null 2>&1
+}
+
+get_instance_status() {
+  sqlplus -s /nolog <<EOF
+CONNECT / AS SYSDBA
+SET HEAD OFF FEEDBACK OFF
+SELECT INSTANCE_NAME || '|' || STATUS FROM GV\$INSTANCE;
+EXIT;
+EOF
+}
+
+get_last_shipped() {
+  sqlplus -s /nolog <<EOF
+CONNECT / AS SYSDBA
+SET HEAD OFF FEEDBACK OFF
+SELECT MAX(SEQUENCE#) FROM GV\$ARCHIVED_LOG;
+EXIT;
+EOF
+}
+
+get_last_applied() {
+  sqlplus -s /nolog <<EOF
+CONNECT / AS SYSDBA
+SET HEAD OFF FEEDBACK OFF
+SELECT MAX(SEQUENCE#) FROM GV\$ARCHIVED_LOG WHERE APPLIED='YES';
+EXIT;
+EOF
+}
+
+generate_lag_bar_html() {
+  local lag=$1
+  local percent=$(( 100 * lag / MAX_LAG_THRESHOLD ))
+  [ "$percent" -gt 100 ] && percent=100
+
+  if [ "$lag" -le 5 ]; then
+    color_class="low"
+  elif [ "$lag" -le 20 ]; then
+    color_class="medium"
+  else
+    color_class="high"
+  fi
+
+  echo "<div class='bar-container'><div class='bar $color_class' style='width:${percent}%'>${lag}</div></div>"
+}
+
+generate_html_header() {
+cat <<EOF > "$HTML_FILE"
+<html>
+<head>
+  <style>
+    body { font-family: Arial, sans-serif; }
+    table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+    th, td { border: 1px solid #999; padding: 8px; text-align: center; }
+    th { background-color: #f2f2f2; }
+    .bar-container {
+      width: 100px;
+      background-color: #ddd;
+      border-radius: 3px;
+      overflow: hidden;
+      margin: 0 auto;
+    }
+    .bar {
+      height: 16px;
+      text-align: right;
+      color: white;
+      font-size: 12px;
+      padding-right: 4px;
+    }
+    .low { background-color: #4CAF50; }
+    .medium { background-color: #FFC107; }
+    .high { background-color: #F44336; }
+  </style>
+</head>
+<body>
+<h2>Oracle DR Standby Sync Report - $(date)</h2>
+<table>
+  <tr>
+    <th>DB Name</th>
+    <th>Instance Status</th>
+    <th>Last Shipped</th>
+    <th>Last Applied</th>
+    <th>Lag (Seq#)</th>
+    <th>Lag Bar</th>
+  </tr>
+EOF
+}
+
+generate_html_footer() {
+  echo "</table></body></html>" >> "$HTML_FILE"
+}
+
+append_html_row() {
+  echo "$1" >> "$HTML_FILE"
+}
+
+# ===== MAIN =====
+
+mkdir -p "$REPORT_DIR"
+generate_html_header
+
+for db in "${DB_LIST[@]}"; do
+  load_db_env "$db"
+
+  instance_status_raw=$(get_instance_status)
+  db_name=$(echo "$instance_status_raw" | cut -d '|' -f1)
+  status=$(echo "$instance_status_raw" | cut -d '|' -f2)
+
+  shipped=$(get_last_shipped)
+  applied=$(get_last_applied)
+
+  shipped=${shipped:-0}
+  applied=${applied:-0}
+  lag=$((shipped - applied))
+  lag_bar=$(generate_lag_bar_html "$lag")
+
+  append_html_row "<tr><td>$db_name</td><td>$status</td><td>$shipped</td><td>$applied</td><td>$lag</td><td>$lag_bar</td></tr>"
+done
+
+generate_html_footer
+
+echo "✔️ Report generated: $HTML_FILE"
