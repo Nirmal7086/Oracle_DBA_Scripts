@@ -1,12 +1,10 @@
-SELECT 
-    inst.instance_name,
-    tsu.tablespace_name, 
-    ROUND(tsu.used_space/(1024*1024),2) AS used_mb, 
-    ROUND(tsu.tablespace_size/(1024*1024),2) AS total_mb, 
-    ROUND(tsu.used_percent, 2) AS used_percent
-FROM 
-    dba_tablespace_usage_metrics tsu
-CROSS JOIN 
-    v$instance inst
-WHERE 
-    ROUND(tsu.used_percent,2) > 85;
+SELECT
+  TARGET_NAME,
+  TABLESPACE_NAME,
+  ROUND((TABLESPACE_USED_SIZE / TABLESPACE_SIZE) * 100, 2) AS USED_PERCENT
+FROM
+  MGMT$DB_TABLESPACES
+WHERE
+  TABLESPACE_USED_SIZE IS NOT NULL
+  AND TABLESPACE_SIZE IS NOT NULL
+  AND (TABLESPACE_USED_SIZE / TABLESPACE_SIZE) * 100 > 85;
