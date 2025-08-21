@@ -1,0 +1,17 @@
+SELECT
+  db.target_name   AS "Database Name",
+  db.host_name     AS "Host",
+  db.version       AS "Database Version",
+  db.target_type   AS "Target Type"
+FROM
+  sysman.mgmt_targets db
+JOIN
+  sysman.mgmt$group_members gm
+    ON gm.member_target_guid = db.target_guid
+JOIN
+  sysman.mgmt_targets grp
+    ON gm.group_target_guid = grp.target_guid
+WHERE
+  grp.target_type = 'oracle_group'
+  AND grp.target_name = 'DB_Monitoring'
+ORDER BY db.target_name
