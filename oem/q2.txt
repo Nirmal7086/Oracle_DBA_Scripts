@@ -1,14 +1,19 @@
-SELECT
-  t.target_name         AS "Database Name",
-  ts.tablespace_name    AS "Tablespace Name",
-  ROUND((ts.tablespace_used_size/ts.tablespace_size)*100,2) AS "Percent Used",
-  ROUND(ts.tablespace_used_size/1024/1024,2) AS "Used MB",
-  ROUND(ts.tablespace_size/1024/1024,2) AS "Total MB"
-FROM
-  sysman.mgmt_targets t,
-  sysman.mgmt$db_tablespaces ts
-WHERE
-  t.target_guid = ts.target_guid
-  AND t.target_type = 'oracle_database'
-  AND ROUND((ts.tablespace_used_size/ts.tablespace_size)*100,2) > 85
-ORDER BY t.target_name, "Percent Used" DESC;
+SELECT 
+  t.target_name AS "Database Name",
+  m.key_value AS "Tablespace Name",
+  ROUND(m.value, 2) AS "Percent Used",
+  TO_CHAR(m.collection_timestamp, 'YYYY-MM-DD HH24:MI:SS') AS "Collection Time"
+FROM 
+  sysman.mgmt$metric_current m
+JOIN 
+  sysman.mgmt_targets t
+ON 
+  t.target_guid = m.target_guid
+WHERE 
+  t.target_type = 'oracle_database'
+  AND m.metric_name = 'tbspAllocation'
+  AND m.metric_column = 'spacePercentUsed'
+  AND m.key_value IS NOT NULL
+  AND ROUND(m.value, 2) > 85
+ORDER BY 
+  t.target_name, "Percent Used" DESC;
