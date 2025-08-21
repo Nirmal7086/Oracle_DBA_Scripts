@@ -7,14 +7,14 @@ SELECT
 FROM
   sysman.mgmt_targets db
 JOIN
-  sysman.mgmt$db_tablespace m
+  sysman.mgmt_db_tablespace m
     ON m.target_guid = db.target_guid
 JOIN
-  sysman.mgmt$group_members gm
-    ON gm.MEMBER_TARGET_GUID = db.target_guid
+  sysman.mgmt_group_members gm
+    ON gm.member_target_guid = db.target_guid
 JOIN
   sysman.mgmt_targets grp
-    ON gm.GROUP_TARGET_GUID = grp.target_guid
+    ON gm.group_target_guid = grp.target_guid
 WHERE
   grp.target_type = 'oracle_group'
   AND grp.target_name = 'DB_Monitoring'
