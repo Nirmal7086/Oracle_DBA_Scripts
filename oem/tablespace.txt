@@ -1,0 +1,16 @@
+SELECT
+  mgmt_targets.target_name              AS database_name,
+  m.tablespace_name,
+  ROUND(m.used_space*8/1024,2)          AS used_mb,
+  ROUND(m.tablespace_size*8/1024,2)     AS total_mb,
+  ROUND(m.used_percent,2)               AS pct_used
+FROM
+  sysman.mgmt_targets
+JOIN
+  sysman.mgmt$db_tablespace m
+      ON m.target_guid = mgmt_targets.target_guid
+WHERE
+  mgmt_targets.target_type = 'oracle_database'
+  AND m.used_percent > 85
+ORDER BY
+  pct_used DESC
