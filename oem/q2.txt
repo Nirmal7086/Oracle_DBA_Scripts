@@ -10,11 +10,5 @@ FROM
 WHERE
   t.target_guid = ts.target_guid
   AND t.target_type = 'oracle_database'
-  AND t.target_name IN (
-    SELECT m.target_name 
-    FROM sysman.mgmt_targets m, sysman.mgmt_group_flat_memberships gf
-    WHERE m.target_guid = gf.member_target_guid
-    AND gf.group_name = 'DB_Monitoring'
-  )
   AND ROUND((ts.tablespace_used_size/ts.tablespace_size)*100,2) > 85
 ORDER BY t.target_name, "Percent Used" DESC;
