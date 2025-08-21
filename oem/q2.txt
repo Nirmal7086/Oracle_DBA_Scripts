@@ -1,22 +1,20 @@
 SELECT
-  db.target_name            AS "Database Name",
-  m.tablespace_name         AS "Tablespace Name",
-  ROUND(m.used_percent,2)   AS "Percent Used",
-  ROUND(m.used_space*8/1024,2)  AS "Used MB",
-  ROUND(m.tablespace_size*8/1024,2) AS "Total MB"
+  t.target_name         AS "Database Name",
+  ts.tablespace_name    AS "Tablespace Name",
+  ROUND((ts.tablespace_used_size/ts.tablespace_size)*100,2) AS "Percent Used",
+  ROUND(ts.tablespace_used_size/1024/1024,2) AS "Used MB",
+  ROUND(ts.tablespace_size/1024/1024,2) AS "Total MB"
 FROM
-  sysman.mgmt_targets db
-JOIN
-  sysman.mgmt_db_tablespace m
-    ON m.target_guid = db.target_guid
-JOIN
-  sysman.mgmt_group_members gm
-    ON gm.member_target_guid = db.target_guid
-JOIN
-  sysman.mgmt_targets grp
-    ON gm.group_target_guid = grp.target_guid
+  sysman.mgmt_targets t,
+  sysman.mgmt$db_tablespaces ts
 WHERE
-  grp.target_type = 'oracle_group'
-  AND grp.target_name = 'DB_Monitoring'
-  AND m.used_percent > 85
-ORDER BY db.target_name, "Percent Used" DESC
+  t.target_guid = ts.target_guid
+  AND t.target_type = 'oracle_database'
+  AND t.target_name IN (
+    SELECT m.target_name 
+    FROM sysman.mgmt_targets m, sysman.mgmt_group_flat_memberships gf
+    WHERE m.target_guid = gf.member_target_guid
+    AND gf.group_name = 'DB_Monitoring'
+  )
+  AND ROUND((ts.tablespace_used_size/ts.tablespace_size)*100,2) > 85
+ORDER BY t.target_name, "Percent Used" DESC;
